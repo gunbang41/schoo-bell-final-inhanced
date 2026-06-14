@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>교무실 알림 - TV 화면</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    background: #0d1b3e;
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* 상단 헤더 */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 40px;
+    background: rgba(255,255,255,0.05);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  .top-bar .school-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #90caf9;
+  }
+  .top-bar .clock {
+    font-size: 28px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: white;
+  }
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #4caf50;
+    display: inline-block;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  .status-text { font-size: 14px; color: #81c784; }
+
+  /* 메인 영역 */
+  .main {
+    flex: 1;
+    display: flex;
+    gap: 0;
+  }
+
+  /* 알림 영역 (왼쪽) */
+  .alert-area {
+    flex: 1.4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  .idle-state {
+    text-align: center;
+    opacity: 0.35;
+  }
+  .idle-state .icon { font-size: 80px; margin-bottom: 16px; }
+  .idle-state p { font-size: 22px; color: #90caf9; }
+
+  .alert-card {
+    display: none;
+    background: white;
+    border-radius: 24px;
+    padding: 48px 52px;
+    text-align: center;
+    width: 100%;
+    max-width: 560px;
+    animation: alertIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275);
+    box-shadow: 0 0 60px rgba(255,255,255,0.15);
+  }
+  .alert-card.show { display: block; }
+  @keyframes alertIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .alert-card .big-avatar {
+    width: 110px; height: 110px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: 900;
+    color: white;
+  }
+  .alert-card .calling-label {
+    font-size: 20px;
+    font-weight: 600;
+    color: #888;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .alert-card .teacher-name {
+    font-size: 52px;
+    font-weight: 900;
+    color: #1a237e;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .alert-card .subject-tag {
+    display: inline-block;
+    padding: 6px 20px;
+    border-radius: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 24px;
+  }
+  .alert-card .message {
+    font-size: 22px;
+    color: #444;
+    line-height: 1.5;
+    border-top: 2px solid #f0f0f0;
+    padding-top: 20px;
+  }
+  .alert-card .call-time {
+    font-size: 14px;
+    color: #bbb;
+    margin-top: 12px;
+  }
+
+  /* 기록 영역 (오른쪽) */
+  .history-area {
+    width: 340px;
+    background: rgba(255,255,255,0.04);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    flex-direction: column;
+    padding: 28px 24px;
+    overflow: hidden;
+  }
+  .history-area h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #90caf9;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .history-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+  .history-item {
+    background: rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideIn 0.3s ease;
+  }
+  .history-item.latest {
+    background: rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  @keyframes slideIn {
+    from { transform: translateX(20px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  .hist-avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+  }
+  .hist-info { flex: 1; min-width: 0; }
+  .hist-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hist-subject { font-size: 12px; color: #90caf9; }
+  .hist-time { font-size: 11px; color: rgba(255,255,255,0.4); text-align: right; }
+
+  /* 하단 안내 */
+  .bottom-bar {
+    padding: 14px 40px;
+    background: rgba(0,0,0,0.3);
+    text-align: center;
+    font-size: 14px;
+    color: rgba(255,255,255,0.3);
+  }
+
+  /* Firebase 설정 */
+  .config-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.6);
+    cursor: pointer;
+  }
+  .config-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+  }
+  .config-overlay.show { display: flex; }
+  .config-box {
+    background: #1e2a4a;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 32px;
+    width: 90%;
+    max-width: 420px;
+  }
+  .config-box h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #90caf9; }
+  .config-box input {
+    width: 100%;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px;
+    color: white;
+    margin-bottom: 10px;
+    font-family: monospace;
+  }
+  .config-box input::placeholder { color: rgba(255,255,255,0.35); }
+  .config-box input:focus { outline: none; border-color: #90caf9; }
+  .btn-save {
+    width: 100%;
+    padding: 13px;
+    background: #1565c0;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .config-note { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 10px; line-height: 1.5; }
+
+  /* 소리 활성화 오버레이 */
+  .sound-overlay {
+    position: fixed;
+    inset: 0;
+    background: #0d1b3e;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s ease;
+  }
+  .sound-overlay.hide {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .sound-box {
+    text-align: center;
+    padding: 40px;
+  }
+  .sound-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+    animation: pulse 2s infinite;
+  }
+  .sound-box h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #90caf9;
+  }
+  .sound-box p {
+    font-size: 15px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+  .sound-btn {
+    padding: 16px 48px;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    background: #1565c0;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+  }
+  .sound-btn:active { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<!-- 소리 활성화 오버레이: 브라우저 자동재생 정책 때문에 처음 한 번 클릭 필요 -->
+<div class="sound-overlay" id="soundOverlay">
+  <div class="sound-box">
+    <div class="sound-icon">🔊</div>
+    <h2>화면을 눌러 시작하세요</h2>
+    <p>음성 안내를 켜기 위해 한 번 터치/클릭이 필요합니다.<br>이후에는 자동으로 작동합니다.</p>
+    <button class="sound-btn" onclick="enableSound()">시작하기</button>
+  </div>
+</div>
+
+<div class="top-bar">
+  <div>
+    <span class="school-name">📣 교무실 호출 시스템</span>
+  </div>
+  <div style="text-align:center">
+    <div class="clock" id="clock">00:00:00</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span class="status-dot"></span>
+    <span class="status-text" id="statusText">연결 대기 중...</span>
+    <button class="config-btn" onclick="document.getElementById('configOverlay').classList.add('show')">⚙️ 설정</button>
+  </div>
+</div>
+
+<div class="main">
+  <!-- 알림 영역 -->
+  <div class="alert-area">
+    <div class="idle-state" id="idleState">
+      <div class="icon">🔔</div>
+      <p>호출을 기다리는 중입니다...</p>
+    </div>
+    <div class="alert-card" id="alertCard">
+      <div class="big-avatar" id="alertAvatar"></div>
+      <div class="calling-label">호출 중</div>
+      <div class="teacher-name" id="alertName"></div>
+      <div class="subject-tag" id="alertSubject"></div>
+      <div class="message">선생님, 교무실 문 앞에<br>학생이 기다리고 있습니다.</div>
+      <div class="call-time" id="alertTime"></div>
+    </div>
+  </div>
+
+  <!-- 기록 영역 -->
+  <div class="history-area">
+    <h2>📋 호출 기록</h2>
+    <div class="history-list" id="historyList">
+      <div style="text-align:center; color:rgba(255,255,255,0.3); font-size:13px; padding-top:20px;">
+        아직 호출 기록이 없습니다
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  교무실 출입은 시험 기간 중 제한됩니다 — 태블릿으로 선생님을 호출해주세요
+</div>
+
+<!-- Firebase 설정 -->
+<div class="config-overlay" id="configOverlay">
+  <div class="config-box">
+    <h3>🔥 Firebase 설정</h3>
+    <input type="text" id="cfgApiKey" placeholder="apiKey" />
+    <input type="text" id="cfgProjectId" placeholder="projectId" />
+    <input type="text" id="cfgDbUrl" placeholder="databaseURL (https://xxx.firebaseio.com)" />
+    <button class="btn-save" onclick="saveConfig()">저장 후 새로고침</button>
+    <p class="config-note">
+      태블릿과 동일한 Firebase 설정을 입력해주세요.<br>
+      Realtime Database 규칙: read/write: true
+    </p>
+    <button style="margin-top:12px; width:100%; padding:10px; background:transparent; border:1px solid rgba(255,255,255,0.2); border-radius:10px; font-size:14px; color:rgba(255,255,255,0.5); cursor:pointer;" onclick="document.getElementById('configOverlay').classList.remove('show')">닫기</button>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getDatabase, ref, get, onChildAdded } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+  // 시계
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // 설정 로드
+  const FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyBq-mAPFBMcmzaF23VzdroUsCkREXIaTMY',
+    authDomain: 'school-call-final.firebaseapp.com',
+    projectId: 'school-call-final',
+    databaseURL: 'https://school-call-final-default-rtdb.firebaseio.com',
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initFirebase();
+  });
+
+  window.enableSound = function() {
+    // 무음 발화로 브라우저의 자동재생 잠금을 해제
+    if ('speechSynthesis' in window) {
+      const unlock = new SpeechSynthesisUtterance(' ');
+      unlock.volume = 0;
+      window.speechSynthesis.speak(unlock);
+    }
+    document.getElementById('soundOverlay').classList.add('hide');
+    setTimeout(() => {
+      document.getElementById('soundOverlay').style.display = 'none';
+    }, 400);
+  };
+
+  window.saveConfig = function() {
+    location.reload();
+  };
+
+  let alertTimeout = null;
+  const history = [];
+
+  function initFirebase() {
+    const cfg = FIREBASE_CONFIG;
+    try {
+      const app = initializeApp({
+        apiKey: cfg.apiKey,
+        authDomain: `${cfg.projectId}.firebaseapp.com`,
+        projectId: cfg.projectId,
+        databaseURL: cfg.databaseURL,
+      });
+      const db = getDatabase(app);
+      const callsRef = ref(db, 'calls');
+
+      // 먼저 기존 데이터를 한 번 읽어서 "이미 처리된 키" 목록을 만든다.
+      // 이렇게 하면 페이지 로드 시점에 이미 존재하는 기록은 알림을 띄우지 않고,
+      // 그 이후에 추가되는 키만 새 호출로 인식한다.
+      const seenKeys = new Set();
+
+      get(callsRef).then((snapshot) => {
+        const initialData = [];
+        snapshot.forEach((child) => {
+          seenKeys.add(child.key);
+          initialData.push(child.val());
+        });
+        // 최신순으로 정렬 (timestamp 내림차순)
+        initialData.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        history.length = 0;
+        history.push(...initialData);
+        renderHistory();
+
+        document.getElementById('statusText').textContent = '연결됨 · 대기 중';
+
+        // 초기 로드가 끝난 후부터 새 항목 감지 시작
+        onChildAdded(callsRef, (snapshot) => {
+          const data = snapshot.val();
+          if (!data) return;
+          if (seenKeys.has(snapshot.key)) return; // 이미 처리된 기존 기록은 무시
+          seenKeys.add(snapshot.key);
+
+          history.unshift(data);
+          if (history.length > 20) history.pop();
+          renderHistory();
+          showAlert(data);
+          speakAlert(data);
+        });
+      }).catch((e) => {
+        document.getElementById('statusText').textContent = '연결 오류: ' + e.message;
+      });
+
+    } catch (e) {
+      document.getElementById('statusText').textContent = '연결 오류: ' + e.message;
+    }
+  }
+
+  function showAlert(data) {
+    const card = document.getElementById('alertCard');
+    const idle = document.getElementById('idleState');
+
+    document.getElementById('alertAvatar').textContent = data.name[0];
+    document.getElementById('alertAvatar').style.background = data.color || '#1a237e';
+    document.getElementById('alertName').textContent = data.name + ' 선생님';
+    const subTag = document.getElementById('alertSubject');
+    subTag.textContent = data.subject;
+    subTag.style.background = data.color || '#1a237e';
+    document.getElementById('alertTime').textContent =
+      '호출 시각: ' + new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
+    idle.style.display = 'none';
+    card.classList.add('show');
+
+    if (alertTimeout) clearTimeout(alertTimeout);
+    alertTimeout = setTimeout(() => {
+      card.classList.remove('show');
+      idle.style.display = 'block';
+    }, 15000);
+  }
+
+  let koreanVoice = null;
+
+  function pickKoreanVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    const koVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('ko'));
+    if (koVoices.length === 0) return null;
+
+    // 더 자연스러운 음성을 우선 선택 (Google, Neural, Online 등 고품질 보이스 우선)
+    const priorityKeywords = ['google', 'neural', 'online', 'natural', 'premium'];
+    for (const keyword of priorityKeywords) {
+      const found = koVoices.find(v => v.name.toLowerCase().includes(keyword));
+      if (found) return found;
+    }
+    return koVoices[0];
+  }
+
+  // 음성 목록은 비동기로 로드되므로 이벤트로 감지
+  if ('speechSynthesis' in window) {
+    koreanVoice = pickKoreanVoice();
+    window.speechSynthesis.onvoiceschanged = () => {
+      koreanVoice = pickKoreanVoice();
+    };
+  }
+
+  function speakAlert(data) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const msg = new SpeechSynthesisUtterance(
+      `${data.subject} 담당 ${data.name} 선생님, 교무실 문 앞에 학생이 기다리고 있습니다. ${data.name} 선생님, 교무실 문 앞으로 나와주세요.`
+    );
+    msg.lang = 'ko-KR';
+    msg.rate = 0.95;
+    msg.pitch = 1;
+    if (koreanVoice) {
+      msg.voice = koreanVoice;
+    }
+    window.speechSynthesis.speak(msg);
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('historyList');
+    if (history.length === 0) {
+      list.innerHTML = '<div style="text-align:center; color:rgba(255,255,255,0.3); font-size:13px; padding-top:20px;">아직 호출 기록이 없습니다</div>';
+      return;
+    }
+    list.innerHTML = history.map((item, i) => {
+      const t = item.timestamp ? new Date(item.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '방금';
+      return `
+        <div class="history-item ${i === 0 ? 'latest' : ''}">
+          <div class="hist-avatar" style="background:${item.color || '#1a237e'}">${item.name[0]}</div>
+          <div class="hist-info">
+            <div class="hist-name">${item.name} 선생님</div>
+            <div class="hist-subject">${item.subject}</div>
+          </div>
+          <div class="hist-time">${t}</div>
+        </div>
+      `;
+    }).join('');
+  }
+</script>
+</body>
+</html>
