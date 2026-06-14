@@ -520,7 +520,8 @@
     const voices = window.speechSynthesis.getVoices();
     if (!voices.length) return null;
 
-    const koVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('ko'));
+    // lang이 정확히 ko 계열인 음성만 사용 (영어 엔진이 한국어를 어눌하게 읽는 것 방지)
+    const koVoices = voices.filter(v => v.lang && v.lang.toLowerCase().replace('_','-').startsWith('ko'));
     if (koVoices.length === 0) return null;
 
     // 더 자연스러운 음성을 우선 선택 (Google, Neural, Online 등 고품질 보이스 우선)
@@ -544,13 +545,14 @@
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const msg = new SpeechSynthesisUtterance(
-      `${data.subject} 담당 ${data.name} 선생님, 교무실 문 앞에 학생이 기다리고 있습니다. ${data.name} 선생님, 교무실 문 앞으로 나와주세요.`
+      `${data.name} 선생님, 학생이 기다리고 있습니다.`
     );
     msg.lang = 'ko-KR';
     msg.rate = 0.95;
     msg.pitch = 1;
     if (koreanVoice) {
       msg.voice = koreanVoice;
+      msg.lang = koreanVoice.lang;
     }
     window.speechSynthesis.speak(msg);
   }
